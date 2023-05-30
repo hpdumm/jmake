@@ -46,10 +46,11 @@ and then call it with just `program-name`.
 By placing *Jmake.java* in the top-level directory the build instructions 
 can live with the code. It also means that builds can be modified per project.
 
-This script runs tests a little bit differently than Java programmers may
+*jmake* runs tests a little bit differently than Java programmers may
 be used to. *jmake* expects all tests to be in the _main_ method (in `public static
-void main(String[] args)`) and to use the builtin java assertions. This setup is
-nice because:
+void main(String[] args)`) and to use Java assertions 
+(<https://docs.oracle.com/javase/8/docs/technotes/guides/language/assert.html>). 
+This setup is nice because:
 
 * all tests live conveniently with the class itself so that the usage
 can be understood and copied easily into new projects,
