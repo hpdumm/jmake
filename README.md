@@ -5,9 +5,10 @@ A simple build system for Java.
 Note: Run from project root!
 
 This build system requires a lib/ and src/ directory at the top level. The 
-lib/ folder must contain all build time and run time dependencies. Because
-Maven projects have a src/ folder, simply add the lib/ folder and copy in
-the dependencies.
+lib/ folder must contain all build time and run time dependencies. The src/
+folder must contain all the sources. Because most projects (like Maven projects)
+have a src/ folder, using *jmake* often means simply creating a lib/ folder 
+and copying dependencies.
 
 The goals are to:
 * Make Java builds easier
@@ -19,22 +20,17 @@ The goals are to:
 
 Build a Java library:
 ```
+cp path/to/Jmake.java project-dir
 cd project-dir
-jmake
+java Jmake.java
 ```
 
 Build a Java program:
 ```
+cp path/to/Jmake.java project-dir
 cd project-dir
-jmake package.MainClass
+java Jmake.java package.MainClass
 ```
-
-Build a Java library or program for release:
-`jmake -r`  or `jmake -r package.MainClass`
-
-Building a release requires that:
-1. the project directory is a git repo and 
-2. that it's status is clean.
 
 An executable script is automatically produced if a
 main class is provided to *jmake*.
@@ -47,11 +43,19 @@ executable script in your terminal like this (in ~/.bashrc):
 
 and then call it with just `program-name`.
 
-*jmake* copies itself into the top-level directory to a file named *build.sh* 
-so that the build instructions can live with the code. It also means that 
-builds can be modified per project. Just call build.sh instead of jmake.
+By placing *Jmake.java* in the top-level directory the build instructions 
+can live with the code. It also means that builds can be modified per project.
 
-This script doesn't run tests (yet) or produce a build script for Windows.
+This script runs tests a little bit differently than Java programmers may
+be used to. *jmake* expects all tests to be in the _main_ method (in `public static
+void main(String[] args)`) and to use the builtin java assertions. This setup is
+nice because:
+
+* all tests live conveniently with the class itself so that the usage
+can be understood and copied easily into new projects,
+* and because no additional dependencies are required. 
+
+While not as capable as *junit*, all tests are now run from about 34 lines of code.
 
 This script does not clean out prior builds. You must manually delete the
 generated bin/ folder to remove past build artifacts, old class files, etc.
