@@ -35,8 +35,10 @@ java Jmake.java package.MainClass
 An executable script is automatically produced if a
 main class is provided to *jmake*.
 
-*jmake* produces a jar file in the top level directory. Don't separate 
-the jar file from its lib/ folder. Consider creating an alias for the
+*jmake* produces a jar file in the bin directory. Don't move the 
+the jar file from its location. The executable script
+expects the jar file to be in bin/ and the dependencies in lib/ based on the 
+classpath values provided in the script. Consider creating an alias for the
 executable script in your terminal like this (in ~/.bashrc):
 
 `alias program-name="path/to/progam-name"`
@@ -56,7 +58,8 @@ This setup is nice because:
 can be understood and copied easily into new projects,
 * and because no additional dependencies are required. 
 
-While not as capable as *junit*, all tests are now run from about 34 lines of code.
+While not as capable as *junit*, all tests are now run from about 34 lines of code
+inside the *jmake* program.
 
-This script does not clean out prior builds. You must manually delete the
-generated bin/ folder to remove past build artifacts, old class files, etc.
+This script does clean out prior builds. The bin/ directory is deleted on each
+run.

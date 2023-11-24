@@ -1,15 +1,18 @@
 package jmake;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -91,6 +94,8 @@ public class Jmake {
 			System.out.println("Creating library (no main class provided)");
 		}
 
+		// present list of available main classes if not provided?
+
 		// get all the java files and write to a temp file
 		Path listfile = Files.createTempFile(null, null);
 		try (Stream<Path> files = Files.find(srcPath, 999,
@@ -99,13 +104,19 @@ public class Jmake {
 			Files.write(listfile, filenames);
 		}
 
+		// delete the bin folder
+		if (Files.isDirectory(Paths.get("bin/"), LinkOption.NOFOLLOW_LINKS)) {
+			System.out.println("Deleting bin/ directory");
+			Files.walk(Paths.get("./bin")).sorted(Comparator.reverseOrder()).map(Path::toFile).forEach(File::delete);
+		}
+
 		// get the os
 		boolean isWindows = System.getProperty("os.name").toLowerCase().startsWith("windows");
 		System.out.format("Compiling on %s with:%n", System.getProperty("os.name"));
 
-		// compile with java 8 by default
-		String[] buildCommand = { "javac", "--source", "8", "--target", "8", "-d", "bin", "-cp", "lib/*", "" };
-		buildCommand[9] = String.format("@%s", listfile);
+		// compile with java 17 by default
+		String[] buildCommand = { "javac", "--release", "17", "-d", "bin", "-cp", "lib/*", "" };
+		buildCommand[7] = String.format("@%s", listfile);
 		Process process;
 		if (isWindows) {
 			buildCommand[8] = "lib\\*";
@@ -119,7 +130,8 @@ public class Jmake {
 		System.err.println(new BufferedReader(new InputStreamReader(in)).lines().collect(Collectors.joining("\n")));
 		System.out.println("");
 
-		// get the current date
+		// get the current date (maybe one day replace with semver computed from
+		// sources)
 		LocalDate date = LocalDate.now();
 		String dateText = date.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
 
@@ -128,7 +140,7 @@ public class Jmake {
 		System.out.println("Creating jar file");
 		System.out.println(separator);
 		String[] jarCommand = { "jar", "cf", "", "-C", "bin", "." };
-		jarCommand[2] = String.format("%s-%s.jar", name, dateText);
+		jarCommand[2] = String.format("bin/%s-%s.jar", name, dateText);
 		Runtime.getRuntime().exec(jarCommand);
 
 		// create executable scripts
@@ -138,10 +150,10 @@ public class Jmake {
 			System.out.println(separator);
 			// mac or linux
 			Files.write(Paths.get(String.format("%s", name)),
-					String.format("java -cp *:lib/* %s", mainClass).getBytes(StandardCharsets.UTF_8));
+					String.format("java -cp bin/*:lib/* %s $@", mainClass).getBytes(StandardCharsets.UTF_8));
 			// windows
 			Files.write(Paths.get(String.format("%s.bat", name)),
-					String.format("java -cp \"*;lib/*\" %s", mainClass).getBytes(StandardCharsets.UTF_8));
+					String.format("java -cp \"bin/*;lib/*\" %s %%*", mainClass).getBytes(StandardCharsets.UTF_8));
 		}
 
 		// generate the javadoc
@@ -165,7 +177,7 @@ public class Jmake {
 				String packageName = firstLine.split("package")[1].trim();
 				packageName = packageName.split(";")[0];
 				String className = p.getFileName().toString().split(".java")[0];
-				String[] testCommand = { "java", "-ea", "-cp", "*:lib/*", "" };
+				String[] testCommand = { "java", "-ea", "-cp", "bin/*:lib/*", "" };
 				testCommand[4] = String.format("%s.%s", packageName, className);
 				if (!testCommand[4].equals(mainClass)) {
 					if (isWindows) {
@@ -183,7 +195,7 @@ public class Jmake {
 
 					} else {
 						System.err.println(output);
-					}	
+					}
 					System.out.println("");
 				}
 			}
