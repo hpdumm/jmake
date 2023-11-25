@@ -8,7 +8,7 @@ This build system requires a lib/ and src/ directory at the top level. The
 lib/ folder must contain all build time and run time dependencies. The src/
 folder must contain all the sources. Because most projects (like Maven projects)
 have a src/ folder, using *jmake* often means simply creating a lib/ folder 
-and copying dependencies.
+and copying all jar dependencies into it.
 
 The goals are to:
 * Make Java builds easier
@@ -19,6 +19,7 @@ The goals are to:
 * Require nothing but OpenJDK
 
 Build a Java library:
+
 ```
 cp path/to/Jmake.java project-dir
 cd project-dir
@@ -26,6 +27,7 @@ java Jmake.java
 ```
 
 Build a Java program:
+
 ```
 cp path/to/Jmake.java project-dir
 cd project-dir
@@ -35,10 +37,9 @@ java Jmake.java package.MainClass
 An executable script is automatically produced if a
 main class is provided to *jmake*.
 
-*jmake* produces a jar file in the bin directory. Don't move the 
-the jar file from its location. The executable script
-expects the jar file to be in bin/ and the dependencies in lib/ based on the 
-classpath values provided in the script. Consider creating an alias for the
+*jmake* produces a jar file in the bin/ directory. The executable script expects
+the jar file and dependencies to be in the bin/ and lib/ folder, respectively.
+To make running the program easier, consider creating an alias for the
 executable script in your terminal like this (in ~/.bashrc):
 
 `alias program-name="path/to/progam-name"`
@@ -51,15 +52,11 @@ can live with the code. It also means that builds can be modified per project.
 *jmake* runs tests a little bit differently than Java programmers may
 be used to. *jmake* expects all tests to be in the _main_ method (in `public static
 void main(String[] args)`) and to use Java assertions 
-(<https://docs.oracle.com/javase/8/docs/technotes/guides/language/assert.html>). 
+(https://docs.oracle.com/javase/8/docs/technotes/guides/language/assert.html). 
 This setup is nice because:
 
 * all tests live conveniently with the class itself so that the usage
 can be understood and copied easily into new projects,
 * and because no additional dependencies are required. 
 
-While not as capable as *junit*, all tests are now run from about 34 lines of code
-inside the *jmake* program.
-
-This script does clean out prior builds. The bin/ directory is deleted on each
-run.
+While not as capable as *junit*, all tests are now run from about 34 lines of code.
