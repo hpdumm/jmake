@@ -18,6 +18,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.Optional;
 
 /**
  * Simple build script for Java
@@ -114,9 +115,12 @@ public class Jmake {
 		boolean isWindows = System.getProperty("os.name").toLowerCase().startsWith("windows");
 		System.out.format("Compiling on %s with:%n", System.getProperty("os.name"));
 
+		// create the output directory
+		boolean created = new File("bin").mkdir();
+
 		// compile with java 17 by default
-		String[] buildCommand = { "javac", "--release", "17", "-d", "bin", "-cp", "lib/*", "" };
-		buildCommand[7] = String.format("@%s", listfile);
+		String[] buildCommand = { "javac", "-encoding", "utf-8", "--release", "17", "-d", "bin", "-cp", "lib/*", "" };
+		buildCommand[9] = String.format("@%s", listfile);
 		Process process;
 		if (isWindows) {
 			buildCommand[8] = "lib\\*";
@@ -172,10 +176,10 @@ public class Jmake {
 				(path, attribute) -> attribute.isRegularFile() && path.getFileName().toString().endsWith(".java"))) {
 			List<Path> paths = files.toList();
 			for (Path p : paths) {
-				List<String> lines = Files.readAllLines(p);
-				String firstLine = lines.get(0);
-				String packageName = firstLine.split("package")[1].trim();
-				packageName = packageName.split(";")[0];
+				// get the package name
+                String packageLine = Files.lines(p).filter(line -> line.startsWith("package")).findFirst().get();
+                String packageName = packageLine.split(" ")[1].replace(";", "");
+                // get class name from filename
 				String className = p.getFileName().toString().split(".java")[0];
 				String[] testCommand = { "java", "-ea", "-cp", "bin/*:lib/*", "" };
 				testCommand[4] = String.format("%s.%s", packageName, className);
