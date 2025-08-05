@@ -66,9 +66,13 @@ public class Jmake {
 		}
 
 		// check that src path exists
-		Path srcPath = Paths.get("src");
+		Path srcPath = Paths.get("src/main/java");
 		if (!Files.exists(srcPath)) {
-			throw new IllegalStateException("Directory not found: src/. At top level of project?");
+		    // try alternate src path (non maven)
+		    srcPath = Paths.get("src");
+		    if (!Files.exists(srcPath)) {
+			    throw new IllegalStateException("Directory not found: src/. At top level of project?");
+		    }
 		}
 
 		// get the project name (same name as current directory where launched)
@@ -122,34 +126,57 @@ public class Jmake {
 		Process process;
 		if (isWindows) {
 			buildCommand[8] = "lib\\*";
-			System.out.println(String.join(" ", buildCommand));
-			process = Runtime.getRuntime().exec(buildCommand);
-		} else {
-			System.out.println(String.join(" ", buildCommand));
-			process = Runtime.getRuntime().exec(buildCommand);
-		}
+		}	
+		//} else {
+		//	System.out.println(String.join(" ", buildCommand));
+		//	System.out.println("");
+		//	process = Runtime.getRuntime().exec(buildCommand);
+		//}
+		System.out.format("  %s%n%n", String.join(" ", buildCommand));
+		process = Runtime.getRuntime().exec(buildCommand);
 		InputStream in = process.getErrorStream();
 		System.err.println(new BufferedReader(new InputStreamReader(in)).lines().collect(Collectors.joining("\n")));
 		System.out.println("");
 
+        // copy the resources into the jar
+        Path resourceDir = Paths.get("src/main/resources");
+        Path destinationDir = Paths.get("bin/");
+        if (Files.exists(resourceDir)) {
+            System.out.println("Copying resources");
+            Files.walk(resourceDir)
+                .forEach(source -> {
+                    Path destination = Paths
+                        .get(destinationDir.toString(), source.toString()
+                        .substring(resourceDir.toString().length()));
+              try {
+                  //System.out.format("destination: %s%n", destination.toString());
+                  Files.copy(source, destination);
+              } catch (java.nio.file.FileAlreadyExistsException e) {
+                  // ignoring this message (finds that bin already exists)
+              } catch (IOException e) {
+                  e.printStackTrace();
+              }
+          });
+        }
+            
 		// get the current date (maybe one day replace with semver computed from
 		// sources)
 		LocalDate date = LocalDate.now();
 		String dateText = date.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
 
 		// create the jar file (-C changes the working directory to bin/)
-		System.out.println(separator);
+		//System.out.println(separator);
 		System.out.println("Creating jar file");
-		System.out.println(separator);
+		//System.out.println(separator);
 		String[] jarCommand = { "jar", "cf", "", "-C", "bin", "." };
 		jarCommand[2] = String.format("bin/%s-%s.jar", name, dateText);
 		Runtime.getRuntime().exec(jarCommand);
 
 		// create executable scripts
 		if (!mainClass.isEmpty()) {
-			System.out.println(separator);
+			//System.out.println(separator);
 			System.out.println("Creating run files");
-			System.out.println(separator);
+			///System.out.println(separator);
 			// mac or linux
 			Files.write(Paths.get(String.format("%s", name)),
 					String.format("java -cp bin/*:lib/* %s $@", mainClass).getBytes(StandardCharsets.UTF_8));
@@ -158,59 +185,91 @@ public class Jmake {
 					String.format("java -cp \"bin/*;lib/*\" %s %%*", mainClass).getBytes(StandardCharsets.UTF_8));
 		}
 
-		// generate the javadoc
-		System.out.println(separator);
-		System.out.println("Creating javadoc");
-		System.out.println(separator);
-		String[] javadocCommand = { "javadoc", "-d", "javadoc/", "" };
-		javadocCommand[3] = String.format("@%s", listfile);
-		Runtime.getRuntime().exec(javadocCommand);
-
-		// run any tests (replacing all of junit with a few lines)
-		System.out.println(separator);
-		System.out.println("Running tests");
-		System.out.println(separator);
-		try (Stream<Path> files = Files.find(srcPath, 999,
-				(path, attribute) -> attribute.isRegularFile() && path.getFileName().toString().endsWith(".java"))) {
-			List<Path> paths = files.toList();
-			for (Path p : paths) {
-				// get the package name
-                String packageLine = Files.lines(p).filter(line -> line.startsWith("package")).findFirst().get();
-                String packageName = packageLine.split(" ")[1].replace(";", "");
-                // get class name from filename
-				String className = p.getFileName().toString().split(".java")[0];
-				String[] testCommand = { "java", "-ea", "-cp", "bin/*:lib/*", "" };
-				testCommand[4] = String.format("%s.%s", packageName, className);
-				if (!testCommand[4].equals(mainClass)) {
-					if (isWindows) {
-						testCommand[3] = "\"*;lib\\*\"";
-					}
-					System.out.println(String.join(" ", testCommand));
-					// run command
-					process = Runtime.getRuntime().exec(testCommand);
-					// print any errors
-					InputStream in2 = process.getErrorStream();
-					String output = new BufferedReader(new InputStreamReader(in2)).lines()
-							.collect(Collectors.joining("\n"));
-					if (output.startsWith("Error: Main method not found")) {
-						System.err.println("no tests found");
-
-					} else {
-						System.err.println(output);
-					}
-					System.out.println("");
-				}
-			}
+        // delete javadoc folder and recreate
+	    if (Files.isDirectory(Paths.get("javadoc/"), LinkOption.NOFOLLOW_LINKS)) {
+			System.out.println("Deleting javadoc/ directory");
+			Files.walk(Paths.get("./javadoc")).sorted(Comparator.reverseOrder()).map(Path::toFile).forEach(File::delete);
 		}
+		
+		// this is not working: The command runs as shown when running in the 
+		// terminal, but here is seems to run forever and no files are put
+		// in the javadoc directory.
+		boolean makeJavadoc = false;
+		if (makeJavadoc) {
+		
+		    // create the javadoc directory
+		    created = new File("javadoc").mkdir();
+		    
+		    // generate the javadoc
+		    // this is not working, needs classpath, chokes on jars with hyphens (hipparchus-core), list file not working?
+		    //System.out.println(separator);
+		    System.out.println("Creating javadoc");
+		    //System.out.println(separator);
+		    String[] javadocCommand = { "javadoc", "-cp", "\"lib/*\"", "-d", "javadoc/", "" };
+		    javadocCommand[5] = String.format("@%s", listfile);
+		    System.out.format("  %s%n%n", String.join(" ", javadocCommand));
+		    try {
+		        process = Runtime.getRuntime().exec(javadocCommand);
+		        // temp file getting deleted without a wait here?
+		        process.waitFor();
+		    } catch (InterruptedException e) {
+		        System.out.println(e.toString());
+		    }
+		}
+		
+		boolean runTests = false;
+		if (runTests) {
+
+		    // run any tests (replacing all of junit with a few lines)
+		    System.out.println(separator);
+		    System.out.println("Running tests");
+		    System.out.println(separator);
+		    try (Stream<Path> files = Files.find(srcPath, 999,
+				    (path, attribute) -> attribute.isRegularFile() && path.getFileName().toString().endsWith(".java"))) {
+			    List<Path> paths = files.toList();
+			    for (Path p : paths) {
+				    // get the package name
+                    String packageLine = Files.lines(p).filter(line -> line.startsWith("package")).findFirst().get();
+                    String packageName = packageLine.split(" ")[1].replace(";", "");
+                    // get class name from filename
+				    String className = p.getFileName().toString().split(".java")[0];
+				    String[] testCommand = { "java", "-ea", "-cp", "bin/*:lib/*", "" };
+				    testCommand[4] = String.format("%s.%s", packageName, className);
+				    if (!testCommand[4].equals(mainClass)) {
+					    if (isWindows) {
+						    testCommand[3] = "\"*;lib\\*\"";
+					    }
+					    System.out.println(String.join(" ", testCommand));
+					    // run command
+					    process = Runtime.getRuntime().exec(testCommand);
+					    // print any errors
+					    InputStream in2 = process.getErrorStream();
+					    String output = new BufferedReader(new InputStreamReader(in2)).lines()
+							    .collect(Collectors.joining("\n"));
+					    if (output.startsWith("Error: Main method not found")) {
+						    System.err.println("no tests found");
+            
+					    } else {
+						    System.err.println(output);
+					    }
+					    System.out.println("");
+				    }
+			    }
+		    }
+		}
+
+        
+            
+            
 
 		// delete the temp file list
 		Files.delete(listfile);
 
 		// finished
 		long stop = System.nanoTime();
-		System.out.println(separator);
+		//System.out.println(separator);
 		System.out.format("Total time: %.3f s%n", (stop - start) / 1_000_000_000.0);
-		System.out.println(separator);
+		//System.out.println(separator);
 
 	}
 }
