@@ -52,7 +52,7 @@ public class Jmake {
 	 * 
 	 * @throws IOException
 	 */
-	public static void main(String[] args) throws IOException {
+	public static void main(String[] args) throws IOException, InterruptedException {
 
 		String separator = "--------------------------------------------------------------";
 
@@ -121,14 +121,15 @@ public class Jmake {
 		boolean created = new File("bin").mkdir();
 
 		// compile with java 17 by default
-		String buildCommand = String.format("javac -encoding utf-8 --release 17 -d bin -cp lib/* @%s", listfile);
+		String[] buildCommand = { "javac", "-encoding", "utf-8", "--release", "17", "-d", "bin", "-cp", "lib/*",
+				String.format("@%s", listfile) };
 		Process process;
 		if (isWindows) {
-			buildCommand = buildCommand.replace("/", "\\");
-			buildCommand = buildCommand.replace(":", ";");
+			buildCommand[8] = "lib\\*";
 		}
-		System.out.println("  " + buildCommand);
-		process = Runtime.getRuntime().exec(buildCommand.split("\s"));
+		System.out.println("  " + String.join(" ", buildCommand));
+		process = Runtime.getRuntime().exec(buildCommand);
+		process.waitFor();
 		InputStream in = process.getErrorStream();
 		System.err.println(new BufferedReader(new InputStreamReader(in)).lines().collect(Collectors.joining("\n")));
 
@@ -158,9 +159,9 @@ public class Jmake {
 
 		// create the jar file (-C changes the working directory to bin/)
 		System.out.println("Creating jar file");
-		String jarCommand = String.format("jar cf bin/%s-%s.jar -C bin .", name, dateText);
-		System.out.println("  " + jarCommand);
-		Runtime.getRuntime().exec(jarCommand.split(" "));
+		String[] jarCommand = { "jar", "cf", String.format("bin/%s-%s.jar", name, dateText), "-C", "bin", "." };
+		System.out.println("  " + String.join(" ", jarCommand));
+		Runtime.getRuntime().exec(jarCommand).waitFor();
 
 		// create executable scripts
 		if (!mainClass.isEmpty()) {
@@ -175,12 +176,15 @@ public class Jmake {
 
 		// generate the javadoc
 		System.out.println("Creating javadoc");
-		String javadocCommand = String.format("javadoc --ignore-source-errors -sourcepath %s -d ./javadoc @%s",
-				srcPath.toString(), listfile);
-		System.out.println("  " + javadocCommand);
-		// javadoc will spit out lots of info that will not be shown here
-		Runtime.getRuntime().exec(javadocCommand.split(" "));
-
+		String[] javadocCommand = { "javadoc", "--ignore-source-errors", "-sourcepath", srcPath.toString(), "-d",
+				"./javadoc", String.format("@%s", listfile) };
+		System.out.println("  " + String.join(" ", javadocCommand));
+		ProcessBuilder pb = new ProcessBuilder(javadocCommand);
+		pb.inheritIO();
+		process = pb.start();
+		process.waitFor();
+		System.out.println("");
+		
 		// generate source jar
 		System.out.println("Creating source jar");
 		String sourceJarCommand = String.format("jar cf bin/%s-%s-sources.jar @%s", name, dateText, listfile);
@@ -199,17 +203,20 @@ public class Jmake {
 				// get class name from filename
 				String className = p.getFileName().toString().split(".java")[0];
 				String fqn = packageName + "." + className;
-				String testCommand = String.format("java -ea -cp bin/*:lib/* %s.%s", packageName, className);
+				// modified for this build to include orekit-data
+				String[] testCommand = { "java", "-ea", "-cp", "bin/*:lib/*",
+						String.format("%s.%s", packageName, className) };
 				if (!fqn.equals(mainClass)) {
 					if (isWindows) {
-						testCommand = testCommand.replace(":", ";");
-						testCommand = testCommand.replace("/", "\\");
+						testCommand[4] = "bin\\*;lib\\*";
 					}
 					System.out.println(testCommand);
 					// run command
-					process = Runtime.getRuntime().exec(testCommand.split("\s"));
+					pb = new ProcessBuilder(testCommand);
+					pb.redirectErrorStream(true);
+					process = pb.start();
 					// print any errors
-					InputStream in2 = process.getErrorStream();
+					InputStream in2 = process.getInputStream();
 					String output = new BufferedReader(new InputStreamReader(in2)).lines()
 							.collect(Collectors.joining("\n"));
 					if (output.startsWith("Error: Main method not found")) {
